@@ -4,7 +4,7 @@ Plugin Name: Interact Quiz Embed
 Plugin URI: https://www.tryinteract.com
 Description: Use this plugin to embed your Interact quiz into your Wordpress site.
 Author: The Quiz Collective Inc.
-Version: 3.1
+Version: 3.2
 Author URI: https://www.tryinteract.com
 
 Copyright 2023 The Quiz Collective Inc.  (email: help@tryinteract.com)
@@ -168,7 +168,7 @@ add_action( 'wp_enqueue_scripts', 'interact_enqueue_scripts' );
 
 function interact_option_page(){
 
-	if(isset($_POST['interact_promotion_id'])) {
+	if(isset($_POST['interact_promotion_id']) && wp_verify_nonce($_POST['interact_promotion_nonce'], 'interact_promotion_action')) {
 		$updatedPromoId = false;
 		$newId = sanitize_text_field($_POST['interact_promotion_id']);
 		
@@ -189,10 +189,10 @@ function interact_option_page(){
 	<div class="wrap">
 		<h1>Interact Quiz Embed Plugin</h1>
 		<hr/>
-		<h2>Embed your Quiz, Poll, or Giveaway with a Shortcode</h2>
+		<h2>Embed your Quiz with a Shortcode</h2>
 		<p>This plugin generates a shortcode which embeds your Interact App into your WordPress content. <a href='https://en.support.wordpress.com/shortcodes/' target='_blank'>How do I use a shortcode?</a></p>
 		<?php
-		if(isset($_POST['app_url'])) {
+		if(isset($_POST['app_url']) && wp_verify_nonce($_POST['interact_shortcode_nonce'], 'interact_shortcode_action')) {
 
 			$app_url = sanitize_url($_POST['app_url']);
 			$parts = explode('/', $app_url);
@@ -235,6 +235,7 @@ function interact_option_page(){
 		}
 		?>
 		<form action="" method="post" id="interact-embed-form">
+			<?php wp_nonce_field('interact_shortcode_action', 'interact_shortcode_nonce'); ?>
 			<table class="form-table">
 				<tr>
 					<th scope="row"><label for="app_id">Interact App URL</label></th>
@@ -271,6 +272,7 @@ function interact_option_page(){
 		<hr/>
 		<h2>Promote your Quiz with a Popup or Announcement Bar</h2>
 		<form action="" method="post">
+			<?php wp_nonce_field('interact_promotion_action', 'interact_promotion_nonce'); ?>
 			<p>Enter your <b>Promotion ID</b> which can be found in your dashboard under 'Embed &amp; Share'</p>
 			<table class="form-table">
 				<tr>
