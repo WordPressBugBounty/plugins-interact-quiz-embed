@@ -1,46 +1,47 @@
-=== Interact: Embed A Quiz On Your Site ===
+=== Interact Quiz & Form Embed ===
 Contributors: tryinteract
-Tags: interact, quiz, poll, giveaway, embed, shortcode, promotion
+Tags: interact, quiz, form, embed, shortcode
 Requires at least: 3.0.1
-Tested up to: 6.8.2
-Stable tag: 3.2
+Tested up to: 7.1.2
+Stable tag: 3.3
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
-Use this plugin to generate a shortcode to embed your Interact Quiz, Poll, or Giveaway into your WordPress site.
+Use this plugin to generate a shortcode to embed your Interact quiz or form into your WordPress site.
 
 == Description ==
 
-Use this plugin to generate a shortcode to embed your Interact Quiz, Poll, or Giveaway into your WordPress site. Promote your quiz within a Popup or an Announcement Bar.
+Use this plugin to generate a shortcode to embed your Interact quiz or form into your WordPress site. Promote your quiz within a Popup or an Announcement Bar.
 
 Check out some examples of how over 30,000 companies have utilized quizzes on their websites [here](https://tryinteract.com/customers/)
 
 **IMPORTANT:** An Interact account is required for this plugin to work as intended. 
 
-Visit [Interact](https://tryinteract.com), sign up, and create an Interact Quiz, Poll, or Giveaway before you embed it into your site. 
+Visit [Interact](https://tryinteract.com), sign up, and create an Interact quiz or form before you embed it into your site. 
 
-Installing this plugin without signing up on [Interact](https://tryinteract.com) will result in a broken quiz experience on your site.
+Installing this plugin without signing up on [Interact](https://tryinteract.com) will result in a broken embed on your site.
 
 Questions? Email help@tryinteract.com
 
 == Installation ==
 
-1. Create a Quiz, Poll, or Giveaway for free at https://www.tryinteract.com
+1. Create a quiz or form for free at https://www.tryinteract.com.
 2. Log in to your site’s Dashboard (e.g. http://www.example.com/wp-admin)
 3. In the left panel, click 'Plugins', then click 'Add New'.
-4. Search for 'Interact Quiz Embed' — the latest version will appear at the top of the list of results.
+4. Search for 'Interact Quiz & Form Embed' — the latest version will appear at the top of the list of results.
 5. Click the 'Install Now' button.
 6. Wait for the installation to finish, then click the 'Activate' button.
-7. Generate shortcode for the quiz you wish to embed
-8. Add shortcode to any post or page in your Wordpress site to embed Quiz, Poll, or Giveaway
+7. Generate a shortcode for the quiz or form you wish to embed
+8. Add the shortcode to any post or page in your WordPress site to embed a quiz or form
 
 
 == Frequently Asked Questions ==
 
 = Where can I find my 'Interact App ID'? =
 
-This can be found in your Interact Dashboard by viewing your quizzes and clicking 'Share & Embed'. 
-For example, it should look something like: https://quiz.tryinteract.com/#/abcdefghijk0123456789
+This can be found in your Interact Dashboard by viewing your quiz or form and clicking 'Share & Embed'.
+A quiz link looks like: https://www.tryinteract.com/share/quiz/6ab538ac73d646369e3959b0
+A form share link looks like: https://form.tryinteract.com/f/pRWnbCjJ
 
 == Screenshots ==
 
@@ -49,6 +50,12 @@ For example, it should look something like: https://quiz.tryinteract.com/#/abcde
 3. An example quiz embed.
 
 == Changelog ==
+
+= 3.3 =
+* Embed a form with type="form". The iframe loads from form.tryinteract.com.
+* Plugin name is now Interact Quiz & Form Embed.
+* Separate shortcode generators for quizzes and forms, with Auto-Resize on by default.
+* Shortcode IDs must be letters and digits; an [interact] shortcode with any other ID renders nothing.
 
 = 3.1 =
 * Added input validation and sanitization for shortcode attributes.

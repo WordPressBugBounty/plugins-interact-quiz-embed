@@ -1,10 +1,10 @@
 <?php
 /*
-Plugin Name: Interact Quiz Embed
+Plugin Name: Interact Quiz & Form Embed
 Plugin URI: https://www.tryinteract.com
-Description: Use this plugin to embed your Interact quiz into your Wordpress site.
+Description: Use this plugin to embed your Interact quiz or form into your WordPress site.
 Author: The Quiz Collective Inc.
-Version: 3.2
+Version: 3.3
 Author URI: https://www.tryinteract.com
 
 Copyright 2023 The Quiz Collective Inc.  (email: help@tryinteract.com)
@@ -31,6 +31,83 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 function is_number($value) {
 	return ctype_digit(strval($value));
+}
+
+function interact_embed_sections() {
+	return array(
+		'quiz' => array(
+			'title' => 'Embed your Quiz with a Shortcode',
+			'noun' => 'quiz',
+			'placeholder' => 'https://www.tryinteract.com/share/quiz/ID',
+			'cover' => true,
+		),
+		'form' => array(
+			'title' => 'Embed your Form with a Shortcode',
+			'noun' => 'form',
+			'placeholder' => 'https://form.tryinteract.com/f/ID',
+			'help' => 'The URL can be found on the "Share Link" tab of the Share & Embed Dialog in your form dashboard. It looks like https://form.tryinteract.com/f/ID.',
+			'cover' => false,
+		),
+	);
+}
+
+function interact_app_types() {
+	return array_keys(interact_embed_sections());
+}
+
+function interact_allowed_value($atts, $key, $allowed, $default) {
+	if (isset($atts[$key]) && in_array($atts[$key], $allowed, true)) {
+		return $atts[$key];
+	}
+
+	return $default;
+}
+
+function interact_is_app_id($id, $length = null) {
+	if (!is_string($id) || !preg_match('/^[A-Za-z0-9]+$/', $id)) {
+		return false;
+	}
+
+	return $length === null || strlen($id) === $length;
+}
+
+function interact_share_url_with_scheme($url) {
+	$url = trim($url);
+	if (preg_match('#^[a-z][a-z0-9+.-]*://#i', $url)) {
+		return $url;
+	}
+	if (strpos($url, '//') === 0) {
+		return 'https:' . $url;
+	}
+	return 'https://' . $url;
+}
+
+function interact_app_from_share_url($url) {
+	if (!is_string($url) || trim($url) === '') {
+		return null;
+	}
+
+	$parsed = parse_url(interact_share_url_with_scheme($url));
+
+	if (!is_array($parsed) || empty($parsed['host']) || empty($parsed['path'])) {
+		return null;
+	}
+
+	$host = strtolower($parsed['host']);
+	$segments = explode('/', trim($parsed['path'], '/'));
+	$id = array_pop($segments);
+	$form_host = $host === 'form.tryinteract.com' || $host === 'form.tryinteract.dev';
+
+	if ($form_host && $segments === array('f') && interact_is_app_id($id, 8)) {
+		return array('id' => $id, 'type' => 'form');
+	}
+
+	$quiz_host = $host === 'www.tryinteract.com' || $host === 'tryinteract.com';
+	if ($quiz_host && $segments === array('share', 'quiz') && interact_is_app_id($id, 24)) {
+		return array('id' => $id, 'type' => 'quiz');
+	}
+
+	return null;
 }
 
 function interact_quiz_embed($atts) {
@@ -70,22 +147,24 @@ add_shortcode('interact-quiz','interact_quiz_embed');
 function interact_embed($atts) {
 	shortcode_atts(array('id'=>'', 'type'=>'quiz', 'w'=>'800', 'h'=>'800', 'no_cover'=>'false'), $atts);
 
+	if (!is_array($atts) || !isset($atts['id']) || !interact_is_app_id($atts['id'])) {
+		return '';
+	}
+
 	wp_enqueue_script('interact-embed-script');
 
-	$valid_app_types = array('quiz', 'poll', 'giveaway');
-	$valid_align_values = array('left', 'right', 'center');
-	$valid_boolean_values = array('true', 'false');
+	$boolean_values = array('true', 'false');
 
-	if(isset($atts['w']) && is_number($atts['w'])) { $width = $atts['w']; } else { $width = '800'; }
- 	if(isset($atts['h']) && is_number($atts['h'])) { $height = $atts['h']; } else { $height = '800'; }
- 	if(isset($atts['type']) && in_array($atts['type'], $valid_app_types)) { $type = $atts['type']; } else { $type = 'quiz'; }
- 	if(isset($atts['no_cover']) && in_array($atts['no_cover'], $valid_boolean_values)) { $no_cover = $atts['no_cover']; } else { $no_cover = 'false'; }
- 	if(isset($atts['mobile']) && in_array($atts['mobile'], $valid_boolean_values)) { $mobile = $atts['mobile']; } else { $mobile = 'true'; }
- 	if(isset($atts['align']) && in_array($atts['align'], $valid_align_values)) { $align = $atts['align']; } else { $align = null; }
- 	if(isset($atts['redirect']) && $atts['redirect'] === 'host') { $redirect = 'host'; } else { $redirect = 'false'; }
+	$width = (isset($atts['w']) && is_number($atts['w'])) ? $atts['w'] : '800';
+	$height = (isset($atts['h']) && is_number($atts['h'])) ? $atts['h'] : '800';
+	$type = interact_allowed_value($atts, 'type', interact_app_types(), 'quiz');
+	$no_cover = interact_allowed_value($atts, 'no_cover', $boolean_values, 'false');
+	$mobile = interact_allowed_value($atts, 'mobile', $boolean_values, 'true');
+	$align = interact_allowed_value($atts, 'align', array('left', 'right', 'center'), null);
+	$redirect = interact_allowed_value($atts, 'redirect', array('host'), 'false');
+	$auto_resize = interact_allowed_value($atts, 'auto_resize', $boolean_values, 'true');
 
 	$app_id = $atts['id'];
-	$host = $type.'.tryinteract.com';
 	$ref = $app_id . md5($app_id . rand());
 
 	if($align) {
@@ -103,11 +182,10 @@ function interact_embed($atts) {
 					var ref = "'.esc_js($ref).'";
 					var w = "'.esc_js($width).'";
 					var h = "'.esc_js($height).'";
-					var host = "'.esc_js($host).'";
 					var no_cover = '.esc_js($no_cover).';
 					var mobile = '.esc_js($mobile).';
 					var redirect = "'.esc_js($redirect).'";
-					var params = { "ref": ref, "appId": app_id, "width": w, "height": h, "async": true, "host": host, "auto_resize": true, "mobile":  mobile, "no_cover": no_cover };
+					var params = { "ref": ref, "appId": app_id, "width": w, "height": h, "async": true, "auto_resize": '.esc_js($auto_resize).', "mobile":  mobile, "no_cover": no_cover, "type": "'.esc_js($type).'" };
 					if(redirect === "host") { 
 						params.redirect_host = true;
 					}
@@ -166,6 +244,113 @@ add_action( 'wp_enqueue_scripts', 'interact_enqueue_scripts' );
 *
 */
 
+function interact_shortcode_text($app, $options) {
+	$shortcode = '[interact id="' . $app['id'] . '" type="' . $app['type'] . '"';
+
+	if (isset($options['width']) && $options['width'] !== '') {
+		$shortcode .= ' w="' . $options['width'] . '"';
+	}
+	if (isset($options['height']) && $options['height'] !== '') {
+		$shortcode .= ' h="' . $options['height'] . '"';
+	}
+	$section = interact_embed_sections()[$app['type']];
+	if (!empty($section['cover']) && !empty($options['no_cover'])) {
+		$shortcode .= ' no_cover="true"';
+	}
+
+	$auto_resize = !empty($options['auto_resize']) ? 'true' : 'false';
+	$shortcode .= ' auto_resize="' . $auto_resize . '"]';
+
+	return $shortcode;
+}
+
+function interact_submitted_shortcode() {
+	if (!isset($_POST['interact_shortcode_kind'])) {
+		return null;
+	}
+
+	$kind = $_POST['interact_shortcode_kind'];
+	if (!in_array($kind, interact_app_types(), true)) {
+		return null;
+	}
+
+	$nonce_key = 'interact_shortcode_nonce_' . $kind;
+	$nonce = isset($_POST[$nonce_key]) ? $_POST[$nonce_key] : '';
+	if (!wp_verify_nonce($nonce, 'interact_shortcode_' . $kind)) {
+		return null;
+	}
+
+	$app_url = isset($_POST['app_url']) ? sanitize_url($_POST['app_url']) : '';
+	$app = interact_app_from_share_url($app_url);
+	if (!$app || $app['type'] !== $kind) {
+		return array('kind' => $kind, 'error' => true);
+	}
+
+	$width = isset($_POST['interact_size_w']) ? sanitize_text_field($_POST['interact_size_w']) : '';
+	$height = isset($_POST['interact_size_h']) ? sanitize_text_field($_POST['interact_size_h']) : '';
+
+	return array(
+		'kind' => $kind,
+		'error' => false,
+		'shortcode' => interact_shortcode_text($app, array(
+			'width' => $width,
+			'height' => $height,
+			'no_cover' => $kind === 'quiz' && isset($_POST['interact_disable_cover']),
+			'auto_resize' => isset($_POST['interact_auto_resize']),
+		)),
+	);
+}
+
+function interact_shortcode_section($kind, $result) {
+	$sections = interact_embed_sections();
+	$section = $sections[$kind];
+	$noun = $section['noun'];
+	$help = isset($section['help'])
+		? $section['help']
+		: 'The URL can be found on the "Share Link" tab of the Share & Embed Dialog in your ' . $noun . ' dashboard.';
+
+	$html = '<hr/><h2>' . esc_html($section['title']) . '</h2>';
+	$html .= '<p>This plugin generates a shortcode which embeds your Interact ' . $noun . ' into your WordPress content. <a href="https://en.support.wordpress.com/shortcodes/" target="_blank">How do I use a shortcode?</a></p>';
+
+	if (is_array($result) && isset($result['kind']) && $result['kind'] === $kind) {
+		if (!empty($result['error'])) {
+			$html .= '<h4 style="color: red;">Invalid App URL...</h4>';
+		} else {
+			$html .= '<h4>Copy &amp; Paste your shortcode into your Post:';
+			$html .= '<pre style="display:block;max-width:720px;background: #333;padding: 20px;border-radius: 4px;color: white;font-weight: 400;">' . esc_html($result['shortcode']) . '</pre>';
+			$html .= '</h4>';
+		}
+	}
+
+	$html .= '<form action="" method="post" id="interact-' . $noun . '-embed-form">';
+	$html .= '<input type="hidden" name="interact_shortcode_kind" value="' . esc_attr($kind) . '" />';
+	$html .= wp_nonce_field('interact_shortcode_' . $kind, 'interact_shortcode_nonce_' . $kind, true, false);
+	$html .= '<table class="form-table">';
+	$html .= '<tr><th scope="row"><label for="' . $noun . '_app_url">Interact App URL</label></th><td>';
+	$html .= '<input name="app_url" type="text" id="' . $noun . '_app_url" placeholder="' . esc_attr($section['placeholder']) . '" value="" class="regular-text" />';
+	$html .= '<p>' . esc_html($help) . '</p></td></tr>';
+	$html .= '<tr><th scope="row">Embed Size</th><td>';
+	$html .= '<label for="' . $noun . '_size_w">Width</label> ';
+	$html .= '<input name="interact_size_w" type="number" step="1" min="0" id="' . $noun . '_size_w" value="" class="small-text" /> ';
+	$html .= '<label for="' . $noun . '_size_h">Height</label> ';
+	$html .= '<input name="interact_size_h" type="number" step="1" min="0" id="' . $noun . '_size_h" value="" class="small-text" />';
+	$html .= '<p class="description">Default size is 800x800px (optional)</p></td></tr>';
+
+	if ($section['cover']) {
+		$html .= '<tr><th scope="row">Cover Page</th><td><label for="' . $noun . '_disable_cover">';
+		$html .= '<input name="interact_disable_cover" id="' . $noun . '_disable_cover" type="checkbox"/> Disable Cover Page';
+		$html .= '<p class="description">Quiz will begin on the first question and skip the cover page (optional)</p>';
+		$html .= '</label></td></tr>';
+	}
+
+	$html .= '<tr><th scope="row">Auto-Resize</th><td><label for="' . $noun . '_auto_resize">';
+	$html .= '<input name="interact_auto_resize" id="' . $noun . '_auto_resize" type="checkbox" checked="checked" /> Auto-Resize';
+	$html .= '</label></td></tr></table>';
+	$html .= '<p><input type="submit" name="submit" value="Generate Shortcode" class="button button-primary"></p></form>';
+
+	return $html;
+}
+
 function interact_option_page(){
 
 	if(isset($_POST['interact_promotion_id']) && wp_verify_nonce($_POST['interact_promotion_nonce'], 'interact_promotion_action')) {
@@ -184,88 +369,15 @@ function interact_option_page(){
 	}
 
 	$id = get_option('interact_promotion_id');
+	$generated = interact_submitted_shortcode();
 
 	?>
 	<div class="wrap">
-		<h1>Interact Quiz Embed Plugin</h1>
-		<hr/>
-		<h2>Embed your Quiz with a Shortcode</h2>
-		<p>This plugin generates a shortcode which embeds your Interact App into your WordPress content. <a href='https://en.support.wordpress.com/shortcodes/' target='_blank'>How do I use a shortcode?</a></p>
+		<h1>Interact Quiz &amp; Form Embed</h1>
 		<?php
-		if(isset($_POST['app_url']) && wp_verify_nonce($_POST['interact_shortcode_nonce'], 'interact_shortcode_action')) {
-
-			$app_url = sanitize_url($_POST['app_url']);
-			$parts = explode('/', $app_url);
-
-			$app_id = null;
-			$app_type = null;
-			$valid_app_types = array('quiz', 'poll', 'giveaway');
-
-			if(count($parts) === 6) {
-				if(in_array($parts[4], $valid_app_types) && isset($parts[5]) && strlen($parts[5]) === 24) {
-					$app_id = $parts[5];
-					$app_type = $parts[4];
-				}
-			}
-
-
-			if(isset($app_id) && isset($app_type)) {
-				echo '<h4>Copy &amp; Paste your shortcode into your Post:';
-
-				$inner_html = '[interact id="'. $app_id .'" type="'. $app_type .'"';
-				
-				if(isset($_POST['interact_size_w']) && !empty($_POST['interact_size_w'])){
-					$sanitized_width = sanitize_text_field($_POST['interact_size_w']);
-					$inner_html .= ' w="'.$sanitized_width.'"';
-				}
-				if(isset($_POST['interact_size_h']) && !empty($_POST['interact_size_h'])){
-					$sanitized_height = sanitize_text_field($_POST['interact_size_h']);
-					$inner_html .= ' h="'.$sanitized_height.'"';
-				}
-				
-				if(isset($_POST['interact_disable_cover'])){
-					$inner_html .= ' no_cover="true"';
-				}
-
-				echo '<pre style="display:block;max-width:720px;background: #333;padding: 20px;border-radius: 4px;color: white;font-weight: 400;">'.esc_html($inner_html.']').'</pre>';
-				echo '</h4>';
-			} else {
-				echo '<h4 style="color: red;">Invalid App URL...</h4>';
-			}
-		}
+		echo interact_shortcode_section('quiz', $generated);
+		echo interact_shortcode_section('form', $generated);
 		?>
-		<form action="" method="post" id="interact-embed-form">
-			<?php wp_nonce_field('interact_shortcode_action', 'interact_shortcode_nonce'); ?>
-			<table class="form-table">
-				<tr>
-					<th scope="row"><label for="app_id">Interact App URL</label></th>
-					<td><input name="app_url" type="text" id="app_id" placeholder="https://www.tryinteract.com/share/app/ID" value="" class="regular-text" />
-					<p>The URL above can be found in your dashboard under <br/><b>'Embed &amp; Share' &gt; 'Embed in your Website' &gt; 'WordPress'.</b></p>
-					</td>
-				</tr>
-				<tr>
-					<th scope="row">Embed Size</th>
-					<td>
-						<label for="interact_size_w">Width</label>
-						<input name="interact_size_w" type="number" step="1" min="0" id="interact_size_w" value="" class="small-text" />
-						<label for="interact_size_h">Height</label>
-						<input name="interact_size_h" type="number" step="1" min="0" id="interact_size_h" value="" class="small-text" />
-						<p class="description">Default size is 600x500px (optional)</p>
-					</td>
-				</tr>
-				<tr>
-					<th scope="row">Cover Page</th>
-					<td>
-						<label for="interact_disable_cover">
-							<input name="interact_disable_cover" id="interact_disable_cover" type="checkbox"/> Disable Cover Page
-							<p class="description">Quiz will begin on the first question and skip the cover page (optional)</p>
-						</label>
-					</td>
-				</tr>
-			</table>
-
-			<p><input type="submit" name="submit" value="Generate Shortcode" class="button button-primary"></p>
-		</form>
 		<br/>
 		<br/>
 
